@@ -1,0 +1,2312 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>12A9 Football</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    overflow: hidden;
+}
+
+h1 {
+    margin: 10px 0 5px;
+    font-size: 28px;
+}
+
+#score {
+    font-size: 22px;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+canvas {
+    display: block;
+    margin: auto;
+    background: #16833b;
+    border: 4px solid white;
+    border-radius: 10px;
+}
+
+#info {
+    margin-top: 8px;
+    font-size: 15px;
+    color: #ddd;
+}
+
+
+/* =========================================
+   MENU
+========================================= */
+
+#menu {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0,0,0,0.94);
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    z-index: 100;
+}
+
+#menu h2 {
+    font-size: 42px;
+    margin: 0 0 10px;
+}
+
+#menu p {
+    color: #aaa;
+    margin-bottom: 25px;
+}
+
+.modeButton {
+    width: 330px;
+
+    padding: 18px;
+
+    margin: 8px;
+
+    border: none;
+    border-radius: 12px;
+
+    background: #222;
+
+    color: white;
+
+    font-size: 20px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.15s;
+}
+
+.modeButton:hover {
+    transform: scale(1.04);
+    background: #333;
+}
+
+.easy:hover {
+    background: #14532d;
+}
+
+.normal:hover {
+    background: #1e3a8a;
+}
+
+.hard:hover {
+    background: #7f1d1d;
+}
+
+</style>
+</head>
+
+<body>
+
+
+<!-- =========================================
+     MENU CHỌN ĐỘ KHÓ
+========================================= -->
+
+<div id="menu">
+
+    <h2>⚽ 12A9 FOOTBALL</h2>
+
+    <p>Chọn độ khó trước khi vào trận</p>
+
+    <button class="modeButton easy" onclick="startGame('easy')">
+        💀 DOWN MỚI CHƠI
+    </button>
+
+    <button class="modeButton normal" onclick="startGame('normal')">
+        ⚽ BÌNH THƯỜNG
+    </button>
+
+    <button class="modeButton hard" onclick="startGame('hard')">
+        ⭐ SIÊU SAO
+    </button>
+
+</div>
+
+
+<h1>⚽ 12A9 FOOTBALL ⚽</h1>
+
+
+<div id="score">
+
+    12A9
+    <span id="scorePlayer">0</span>
+
+    -
+
+    <span id="scoreEnemy">0</span>
+    TEAM BẠN
+
+</div>
+
+
+<canvas
+    id="game"
+    width="960"
+    height="580">
+</canvas>
+
+
+<div id="info">
+
+    W A S D: Di chuyển
+    &nbsp; | &nbsp;
+    SPACE: Sút
+
+</div>
+
+
+<script>
+
+
+// ======================================================
+// CANVAS
+// ======================================================
+
+const canvas = document.getElementById("game");
+
+const ctx = canvas.getContext("2d");
+
+const W = canvas.width;
+const H = canvas.height;
+
+
+// ======================================================
+// DIFFICULTY
+// ======================================================
+
+let difficulty = "normal";
+
+
+const difficultySettings = {
+
+    easy: {
+
+        reaction: 0.55,
+
+        chaseDistance: 150,
+
+        controlStrength: 0.45,
+
+        shootMin: 4.0,
+        shootMax: 6.0,
+
+        shotError: 80
+    },
+
+
+    normal: {
+
+        reaction: 0.80,
+
+        chaseDistance: 180,
+
+        controlStrength: 0.72,
+
+        shootMin: 2.2,
+        shootMax: 3.5,
+
+        shotError: 55
+    },
+
+
+    hard: {
+
+        reaction: 1.0,
+
+        chaseDistance: 220,
+
+        controlStrength: 1.0,
+
+        shootMin: 1.4,
+        shootMax: 2.3,
+
+        shotError: 32
+    }
+};
+
+
+// ======================================================
+// PLAYER
+// ======================================================
+
+const player = {
+
+    x: 280,
+    y: 290,
+
+    r: 19,
+
+    vx: 0,
+    vy: 0,
+
+    maxSpeed: 260,
+
+    accel: 1500,
+
+    friction: 0.82
+};
+
+
+// ======================================================
+// ENEMY
+// ======================================================
+
+const enemy = {
+
+    x: 680,
+    y: 290,
+
+    r: 19,
+
+    vx: 0,
+    vy: 0,
+
+    // KHÔNG THAY ĐỔI TỐC ĐỘ TEAM BẠN
+    maxSpeed: 150,
+
+    lastBallTouch: 0
+};
+
+
+// ======================================================
+// BALL
+// ======================================================
+
+const ball = {
+
+    x: 480,
+    y: 290,
+
+    r: 10,
+
+    vx: 0,
+    vy: 0,
+
+    friction: 0.18,
+
+    collisionCooldown: 0
+};
+
+
+// ======================================================
+// GOALKEEPERS
+// ======================================================
+
+const keeperLeft = {
+
+    x: 45,
+
+    y: 250,
+
+    // NHỎ HƠN
+    w: 13,
+    h: 80,
+
+    vy: 0,
+
+    speed: 110,
+
+    // Nhịp riêng của thủ môn trái
+    phase: 0
+};
+
+
+const keeperRight = {
+
+    x: W - 58,
+
+    y: 250,
+
+    // NHỎ HƠN
+    w: 13,
+    h: 80,
+
+    vy: 0,
+
+    speed: 110,
+
+    // Thủ môn phải lệch nhịp một chút
+    phase: Math.PI
+};
+
+
+// ======================================================
+// VARIABLES
+// ======================================================
+
+let scorePlayer = 0;
+
+let scoreEnemy = 0;
+
+let keys = {};
+
+let celebration = false;
+
+let celebrationTimer = 0;
+
+let celebrationText = "";
+
+let particles = [];
+
+let enemyShootTimer = 2;
+
+let gameStarted = false;
+
+
+// ======================================================
+// START GAME
+// ======================================================
+
+function startGame(mode) {
+
+    difficulty = mode;
+
+    gameStarted = true;
+
+    document.getElementById("menu").style.display = "none";
+
+    resetPositions();
+}
+
+
+// ======================================================
+// KEYBOARD
+// ======================================================
+
+document.addEventListener("keydown", e => {
+
+    keys[e.key.toLowerCase()] = true;
+
+    if (e.code === "Space") {
+
+        e.preventDefault();
+
+        if (gameStarted && !celebration) {
+
+            playerShoot();
+        }
+    }
+});
+
+
+document.addEventListener("keyup", e => {
+
+    keys[e.key.toLowerCase()] = false;
+});
+
+
+// ======================================================
+// UTILS
+// ======================================================
+
+function clamp(value, min, max) {
+
+    return Math.max(min, Math.min(max, value));
+}
+
+
+// ======================================================
+// RESET
+// ======================================================
+
+function resetPositions() {
+
+    player.x = 280;
+    player.y = 290;
+
+    player.vx = 0;
+    player.vy = 0;
+
+
+    enemy.x = 680;
+    enemy.y = 290;
+
+    enemy.vx = 0;
+    enemy.vy = 0;
+
+
+    ball.x = 480;
+    ball.y = 290;
+
+    ball.vx = 0;
+    ball.vy = 0;
+
+    ball.collisionCooldown = 0;
+
+
+    // Reset vị trí thủ môn
+    keeperLeft.y = 250;
+    keeperRight.y = 250;
+
+    // Reset nhịp chuyển động
+    keeperLeft.phase = 0;
+    keeperRight.phase = Math.PI;
+
+
+    const settings =
+        difficultySettings[difficulty];
+
+
+    enemyShootTimer =
+        settings.shootMin +
+        Math.random() *
+        (
+            settings.shootMax -
+            settings.shootMin
+        );
+}
+
+
+// ======================================================
+// PLAYER MOVEMENT
+// ======================================================
+
+function updatePlayer(dt) {
+
+    let ax = 0;
+    let ay = 0;
+
+
+    if (keys["w"]) ay -= 1;
+
+    if (keys["s"]) ay += 1;
+
+    if (keys["a"]) ax -= 1;
+
+    if (keys["d"]) ax += 1;
+
+
+    if (ax !== 0 || ay !== 0) {
+
+        const len =
+            Math.hypot(ax, ay);
+
+        ax /= len;
+        ay /= len;
+
+
+        player.vx +=
+            ax *
+            player.accel *
+            dt;
+
+        player.vy +=
+            ay *
+            player.accel *
+            dt;
+
+    } else {
+
+        player.vx *=
+            Math.pow(
+                player.friction,
+                dt * 60
+            );
+
+        player.vy *=
+            Math.pow(
+                player.friction,
+                dt * 60
+            );
+    }
+
+
+    const speed =
+        Math.hypot(
+            player.vx,
+            player.vy
+        );
+
+
+    if (speed > player.maxSpeed) {
+
+        player.vx =
+            player.vx /
+            speed *
+            player.maxSpeed;
+
+        player.vy =
+            player.vy /
+            speed *
+            player.maxSpeed;
+    }
+
+
+    player.x +=
+        player.vx * dt;
+
+    player.y +=
+        player.vy * dt;
+
+
+    player.x =
+        clamp(
+            player.x,
+            80,
+            W - 80
+        );
+
+    player.y =
+        clamp(
+            player.y,
+            50,
+            H - 50
+        );
+}
+
+
+// ======================================================
+// PLAYER ↔ BALL
+// ======================================================
+
+function playerBallCollision() {
+
+    if (ball.collisionCooldown > 0)
+        return;
+
+
+    let dx =
+        ball.x - player.x;
+
+    let dy =
+        ball.y - player.y;
+
+
+    let dist =
+        Math.hypot(dx, dy);
+
+
+    const minDist =
+        player.r + ball.r;
+
+
+    if (dist >= minDist)
+        return;
+
+
+    if (dist === 0) {
+
+        dx = 1;
+        dy = 0;
+
+        dist = 1;
+    }
+
+
+    const nx =
+        dx / dist;
+
+    const ny =
+        dy / dist;
+
+
+    const overlap =
+        minDist - dist;
+
+
+    ball.x +=
+        nx * overlap;
+
+    ball.y +=
+        ny * overlap;
+
+
+    const rvx =
+        ball.vx - player.vx;
+
+    const rvy =
+        ball.vy - player.vy;
+
+
+    const relativeVelocity =
+        rvx * nx +
+        rvy * ny;
+
+
+    if (relativeVelocity < 0) {
+
+        const restitution = 0.88;
+
+        const playerMass = 5;
+
+        const ballMass = 1;
+
+
+        const impulse =
+            -(1 + restitution) *
+            relativeVelocity /
+            (
+                1 / playerMass +
+                1 / ballMass
+            );
+
+
+        const ix =
+            impulse * nx;
+
+        const iy =
+            impulse * ny;
+
+
+        player.vx -=
+            ix / playerMass;
+
+        player.vy -=
+            iy / playerMass;
+
+
+        ball.vx +=
+            ix / ballMass;
+
+        ball.vy +=
+            iy / ballMass;
+    }
+
+
+    const speed =
+        Math.hypot(
+            ball.vx,
+            ball.vy
+        );
+
+
+    if (speed > 330) {
+
+        ball.vx =
+            ball.vx /
+            speed *
+            330;
+
+        ball.vy =
+            ball.vy /
+            speed *
+            330;
+    }
+
+
+    ball.collisionCooldown = 0.045;
+}
+
+
+// ======================================================
+// PLAYER SHOOT
+// ======================================================
+
+function playerShoot() {
+
+    let dx =
+        ball.x - player.x;
+
+    let dy =
+        ball.y - player.y;
+
+
+    let dist =
+        Math.hypot(dx, dy);
+
+
+    if (dist > 65)
+        return;
+
+
+    if (dist === 0) {
+
+        dx = 1;
+        dy = 0;
+
+        dist = 1;
+    }
+
+
+    dx /= dist;
+    dy /= dist;
+
+
+    const power = 760;
+
+
+    ball.vx =
+        dx * power +
+        player.vx * 0.35;
+
+
+    ball.vy =
+        dy * power +
+        player.vy * 0.35;
+
+
+    ball.collisionCooldown = 0.14;
+}
+
+
+// ======================================================
+// AI: HƯỚNG VỀ KHUNG THÀNH
+// ======================================================
+
+function getEnemyGoalDirection() {
+
+    const targetX = 20;
+
+    const targetY = 290;
+
+
+    let dx =
+        targetX - ball.x;
+
+    let dy =
+        targetY - ball.y;
+
+
+    const len =
+        Math.hypot(dx, dy);
+
+
+    if (len === 0) {
+
+        return {
+            x: -1,
+            y: 0
+        };
+    }
+
+
+    return {
+
+        x: dx / len,
+
+        y: dy / len
+    };
+}
+
+
+// ======================================================
+// AI: DẪN BÓNG
+// ======================================================
+
+function enemyControlBall(dt) {
+
+    const settings =
+        difficultySettings[difficulty];
+
+
+    let dx =
+        ball.x - enemy.x;
+
+    let dy =
+        ball.y - enemy.y;
+
+
+    let dist =
+        Math.hypot(dx, dy);
+
+
+    if (dist < enemy.r + ball.r + 5) {
+
+        const goalDir =
+            getEnemyGoalDirection();
+
+
+        const desiredX =
+            enemy.x +
+            goalDir.x * 32;
+
+        const desiredY =
+            enemy.y +
+            goalDir.y * 32;
+
+
+        let pushX =
+            desiredX - ball.x;
+
+        let pushY =
+            desiredY - ball.y;
+
+
+        const pushLen =
+            Math.hypot(
+                pushX,
+                pushY
+            );
+
+
+        if (pushLen > 0) {
+
+            pushX /= pushLen;
+            pushY /= pushLen;
+
+
+            ball.vx +=
+                pushX *
+                155 *
+                settings.controlStrength *
+                dt;
+
+            ball.vy +=
+                pushY *
+                155 *
+                settings.controlStrength *
+                dt;
+        }
+
+
+        enemy.lastBallTouch = 0.25;
+    }
+
+
+    if (enemy.lastBallTouch > 0) {
+
+        enemy.lastBallTouch -= dt;
+    }
+}
+
+
+// ======================================================
+// AI SHOOT
+// ======================================================
+
+function enemyShoot() {
+
+    if (celebration)
+        return;
+
+
+    let dx =
+        ball.x - enemy.x;
+
+    let dy =
+        ball.y - enemy.y;
+
+
+    const dist =
+        Math.hypot(dx, dy);
+
+
+    if (dist > 62)
+        return;
+
+
+    const settings =
+        difficultySettings[difficulty];
+
+
+    let targetY =
+        290 +
+        (
+            Math.random() - 0.5
+        ) *
+        settings.shotError;
+
+
+    targetY =
+        clamp(
+            targetY,
+            235,
+            345
+        );
+
+
+    let vx =
+        20 - ball.x;
+
+    let vy =
+        targetY - ball.y;
+
+
+    const len =
+        Math.hypot(vx, vy);
+
+
+    if (len === 0)
+        return;
+
+
+    vx /= len;
+    vy /= len;
+
+
+    const power = 500;
+
+
+    ball.vx =
+        vx * power;
+
+    ball.vy =
+        vy * power;
+
+
+    ball.collisionCooldown = 0.14;
+
+
+    enemy.lastBallTouch = 0;
+}
+
+
+// ======================================================
+// AI MOVEMENT
+// ======================================================
+
+function updateEnemy(dt) {
+
+    if (celebration)
+        return;
+
+
+    const settings =
+        difficultySettings[difficulty];
+
+
+    let dx =
+        ball.x - enemy.x;
+
+    let dy =
+        ball.y - enemy.y;
+
+
+    let dist =
+        Math.hypot(dx, dy);
+
+
+    let targetX =
+        ball.x;
+
+    let targetY =
+        ball.y;
+
+
+    if (
+        ball.x < 260 &&
+        ball.x < enemy.x
+    ) {
+
+        targetX =
+            ball.x + 20;
+
+        targetY =
+            ball.y;
+    }
+
+
+    dx =
+        targetX - enemy.x;
+
+    dy =
+        targetY - enemy.y;
+
+
+    dist =
+        Math.hypot(dx, dy);
+
+
+    if (dist > 1) {
+
+        dx /= dist;
+        dy /= dist;
+
+
+        enemy.vx +=
+            dx *
+            500 *
+            settings.reaction *
+            dt;
+
+        enemy.vy +=
+            dy *
+            500 *
+            settings.reaction *
+            dt;
+
+    } else {
+
+        enemy.vx *= 0.90;
+        enemy.vy *= 0.90;
+    }
+
+
+    let speed =
+        Math.hypot(
+            enemy.vx,
+            enemy.vy
+        );
+
+
+    if (speed > enemy.maxSpeed) {
+
+        enemy.vx =
+            enemy.vx /
+            speed *
+            enemy.maxSpeed;
+
+        enemy.vy =
+            enemy.vy /
+            speed *
+            enemy.maxSpeed;
+    }
+
+
+    enemy.x +=
+        enemy.vx * dt;
+
+    enemy.y +=
+        enemy.vy * dt;
+
+
+    enemy.x =
+        clamp(
+            enemy.x,
+            100,
+            W - 100
+        );
+
+    enemy.y =
+        clamp(
+            enemy.y,
+            50,
+            H - 50
+        );
+
+
+    enemyControlBall(dt);
+
+
+    enemyShootTimer -= dt;
+
+
+    const nearBall =
+        Math.hypot(
+            ball.x - enemy.x,
+            ball.y - enemy.y
+        ) < 62;
+
+
+    const inShootingArea =
+        ball.x < 360;
+
+
+    if (
+        enemyShootTimer <= 0 &&
+        nearBall &&
+        inShootingArea
+    ) {
+
+        enemyShoot();
+
+
+        enemyShootTimer =
+            settings.shootMin +
+            Math.random() *
+            (
+                settings.shootMax -
+                settings.shootMin
+            );
+    }
+
+
+    enemyBallCollision();
+}
+
+
+// ======================================================
+// ENEMY ↔ BALL
+// ======================================================
+
+function enemyBallCollision() {
+
+    let dx =
+        ball.x - enemy.x;
+
+    let dy =
+        ball.y - enemy.y;
+
+
+    let dist =
+        Math.hypot(dx, dy);
+
+
+    const minDist =
+        enemy.r + ball.r;
+
+
+    if (dist >= minDist)
+        return;
+
+
+    if (dist === 0) {
+
+        dx = -1;
+        dy = 0;
+
+        dist = 1;
+    }
+
+
+    const nx =
+        dx / dist;
+
+    const ny =
+        dy / dist;
+
+
+    const overlap =
+        minDist - dist;
+
+
+    ball.x +=
+        nx * overlap;
+
+    ball.y +=
+        ny * overlap;
+
+
+    const rvx =
+        ball.vx - enemy.vx;
+
+    const rvy =
+        ball.vy - enemy.vy;
+
+
+    const relativeVelocity =
+        rvx * nx +
+        rvy * ny;
+
+
+    if (relativeVelocity < 0) {
+
+        const restitution = 0.88;
+
+        const enemyMass = 5;
+
+        const ballMass = 1;
+
+
+        const impulse =
+            -(1 + restitution) *
+            relativeVelocity /
+            (
+                1 / enemyMass +
+                1 / ballMass
+            );
+
+
+        const ix =
+            impulse * nx;
+
+        const iy =
+            impulse * ny;
+
+
+        enemy.vx -=
+            ix / enemyMass;
+
+        enemy.vy -=
+            iy / enemyMass;
+
+
+        ball.vx +=
+            ix / ballMass;
+
+        ball.vy +=
+            iy / ballMass;
+    }
+
+
+    const speed =
+        Math.hypot(
+            ball.vx,
+            ball.vy
+        );
+
+
+    if (speed > 330) {
+
+        ball.vx =
+            ball.vx /
+            speed *
+            330;
+
+        ball.vy =
+            ball.vy /
+            speed *
+            330;
+    }
+}
+
+
+// ======================================================
+// GOALKEEPER COLLISION
+// ======================================================
+
+function goalkeeperCollision(keeper) {
+
+    const closestX =
+        clamp(
+            ball.x,
+            keeper.x,
+            keeper.x + keeper.w
+        );
+
+
+    const closestY =
+        clamp(
+            ball.y,
+            keeper.y,
+            keeper.y + keeper.h
+        );
+
+
+    let dx =
+        ball.x - closestX;
+
+    let dy =
+        ball.y - closestY;
+
+
+    let dist =
+        Math.hypot(dx, dy);
+
+
+    if (dist < ball.r) {
+
+        let nx;
+        let ny;
+
+
+        if (dist === 0) {
+
+            const speed =
+                Math.hypot(
+                    ball.vx,
+                    ball.vy
+                );
+
+
+            if (speed > 0) {
+
+                nx =
+                    -ball.vx / speed;
+
+                ny =
+                    -ball.vy / speed;
+
+            } else {
+
+                nx = 1;
+                ny = 0;
+            }
+
+        } else {
+
+            nx =
+                dx / dist;
+
+            ny =
+                dy / dist;
+        }
+
+
+        const overlap =
+            ball.r - dist;
+
+
+        ball.x +=
+            nx * overlap;
+
+        ball.y +=
+            ny * overlap;
+
+
+        const dot =
+            ball.vx * nx +
+            ball.vy * ny;
+
+
+        if (dot < 0) {
+
+            ball.vx =
+                ball.vx -
+                2 * dot * nx;
+
+            ball.vy =
+                ball.vy -
+                2 * dot * ny;
+
+
+            ball.vx *= 0.72;
+            ball.vy *= 0.72;
+
+
+            ball.vy +=
+                keeper.vy * 0.25;
+        }
+
+
+        ball.collisionCooldown =
+            0.08;
+    }
+}
+
+
+// ======================================================
+// GOALKEEPER AI
+// CHỈ CHẠY LÊN/XUỐNG THEO NHỊP
+// KHÔNG THEO BÓNG
+// ======================================================
+
+function updateGoalkeeper(
+    keeper,
+    dt
+) {
+
+    /*
+       Thủ môn di chuyển theo sóng sin.
+
+       Không kiểm tra:
+       - vị trí cầu thủ
+       - vị trí bóng
+       - vị trí đối thủ
+
+       => chuyển động hoàn toàn độc lập.
+    */
+
+
+    const rhythmSpeed = 1.8;
+
+    // Biên độ chạy lên/xuống
+    const movementRange = 145;
+
+    // Tâm chuyển động
+    const centerY = 250;
+
+
+    // Tăng nhịp
+    keeper.phase +=
+        rhythmSpeed * dt;
+
+
+    /*
+       sin() tạo chuyển động:
+
+       giữa
+        ↓
+       xuống
+        ↓
+       giữa
+        ↓
+       lên
+        ↓
+       giữa
+
+       nên thủ môn chạy rất mượt.
+    */
+
+    const targetY =
+        centerY +
+        Math.sin(keeper.phase) *
+        movementRange;
+
+
+    /*
+       Tính vận tốc thực tế để
+       va chạm với bóng vẫn có cảm giác
+       thủ môn đang di chuyển.
+    */
+
+    const previousY =
+        keeper.y;
+
+
+    keeper.y =
+        clamp(
+            targetY,
+            80,
+            H - 80 - keeper.h
+        );
+
+
+    keeper.vy =
+        (keeper.y - previousY) /
+        Math.max(dt, 0.001);
+}
+
+
+// ======================================================
+// BALL PHYSICS
+// ======================================================
+
+function updateBall(dt) {
+
+    ball.collisionCooldown -= dt;
+
+
+    const steps = 5;
+
+    const subDt =
+        dt / steps;
+
+
+    for (
+        let i = 0;
+        i < steps;
+        i++
+    ) {
+
+        // Ma sát
+        ball.vx *=
+            Math.pow(
+                1 - ball.friction,
+                subDt
+            );
+
+        ball.vy *=
+            Math.pow(
+                1 - ball.friction,
+                subDt
+            );
+
+
+        // Di chuyển
+        ball.x +=
+            ball.vx * subDt;
+
+        ball.y +=
+            ball.vy * subDt;
+
+
+        // =========================================
+        // BIÊN TRÊN
+        // =========================================
+
+        if (
+            ball.y - ball.r < 30
+        ) {
+
+            ball.y =
+                30 + ball.r;
+
+
+            ball.vy =
+                Math.abs(ball.vy) *
+                0.86;
+        }
+
+
+        // =========================================
+        // BIÊN DƯỚI
+        // =========================================
+
+        if (
+            ball.y + ball.r >
+            H - 30
+        ) {
+
+            ball.y =
+                H - 30 - ball.r;
+
+
+            ball.vy =
+                -Math.abs(ball.vy) *
+                0.86;
+        }
+
+
+        // =========================================
+        // THỦ MÔN
+        // =========================================
+
+        goalkeeperCollision(
+            keeperLeft
+        );
+
+        goalkeeperCollision(
+            keeperRight
+        );
+
+
+        // =========================================
+        // GOAL TRÁI
+        // =========================================
+
+        if (
+            ball.x - ball.r < 0 &&
+            ball.y > 220 &&
+            ball.y < 360
+        ) {
+
+            goal(false);
+
+            return;
+        }
+
+
+        // =========================================
+        // GOAL PHẢI
+        // =========================================
+
+        if (
+            ball.x + ball.r > W &&
+            ball.y > 220 &&
+            ball.y < 360
+        ) {
+
+            goal(true);
+
+            return;
+        }
+
+
+        // =========================================
+        // BIÊN TRÁI
+        // =========================================
+
+        if (
+            ball.x - ball.r < 30 &&
+            (
+                ball.y <= 220 ||
+                ball.y >= 360
+            )
+        ) {
+
+            ball.x =
+                30 + ball.r;
+
+
+            ball.vx =
+                Math.abs(ball.vx) *
+                0.86;
+        }
+
+
+        // =========================================
+        // BIÊN PHẢI
+        // =========================================
+
+        if (
+            ball.x + ball.r >
+            W - 30 &&
+            (
+                ball.y <= 220 ||
+                ball.y >= 360
+            )
+        ) {
+
+            ball.x =
+                W - 30 - ball.r;
+
+
+            ball.vx =
+                -Math.abs(ball.vx) *
+                0.86;
+        }
+    }
+}
+
+
+// ======================================================
+// GOAL
+// ======================================================
+
+function goal(playerGoal) {
+
+    if (celebration)
+        return;
+
+
+    celebration = true;
+
+    celebrationTimer = 2.5;
+
+
+    if (playerGoal) {
+
+        scorePlayer++;
+
+
+        document.getElementById(
+            "scorePlayer"
+        ).textContent =
+            scorePlayer;
+
+
+        celebrationText =
+            "SIÊU SAO ⭐";
+
+    } else {
+
+        scoreEnemy++;
+
+
+        document.getElementById(
+            "scoreEnemy"
+        ).textContent =
+            scoreEnemy;
+
+
+        celebrationText =
+            "CHÁO ĐO 💀";
+    }
+
+
+    ball.vx = 0;
+    ball.vy = 0;
+
+
+    createParticles(
+        ball.x,
+        ball.y
+    );
+}
+
+
+// ======================================================
+// PARTICLES
+// ======================================================
+
+function createParticles(x, y) {
+
+    particles = [];
+
+
+    for (
+        let i = 0;
+        i < 70;
+        i++
+    ) {
+
+        const angle =
+            Math.random() *
+            Math.PI * 2;
+
+
+        const speed =
+            80 +
+            Math.random() * 260;
+
+
+        particles.push({
+
+            x: x,
+
+            y: y,
+
+            vx:
+                Math.cos(angle) *
+                speed,
+
+            vy:
+                Math.sin(angle) *
+                speed,
+
+            life:
+                1 +
+                Math.random(),
+
+            size:
+                3 +
+                Math.random() * 6
+        });
+    }
+}
+
+
+function updateParticles(dt) {
+
+    for (const p of particles) {
+
+        p.x +=
+            p.vx * dt;
+
+        p.y +=
+            p.vy * dt;
+
+
+        p.vy +=
+            250 * dt;
+
+
+        p.life -= dt;
+    }
+
+
+    particles =
+        particles.filter(
+            p => p.life > 0
+        );
+}
+
+
+// ======================================================
+// UPDATE
+// ======================================================
+
+function update(dt) {
+
+    if (!gameStarted)
+        return;
+
+
+    if (!celebration) {
+
+        updatePlayer(dt);
+
+
+        // AI LUÔN CHẠY THEO BÓNG
+        updateEnemy(dt);
+
+
+        // THỦ MÔN CHẠY THEO NHỊP
+        // KHÔNG THEO CẦU THỦ / BÓNG
+        updateGoalkeeper(
+            keeperLeft,
+            dt
+        );
+
+        updateGoalkeeper(
+            keeperRight,
+            dt
+        );
+
+
+        playerBallCollision();
+
+
+        updateBall(dt);
+
+
+        playerBallCollision();
+
+    } else {
+
+        celebrationTimer -= dt;
+
+
+        if (
+            celebrationTimer <= 0
+        ) {
+
+            celebration = false;
+
+            resetPositions();
+        }
+    }
+
+
+    updateParticles(dt);
+}
+
+
+// ======================================================
+// DRAW FIELD
+// ======================================================
+
+function drawField() {
+
+    ctx.clearRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    // Sân
+    ctx.fillStyle =
+        "#16833b";
+
+
+    ctx.fillRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    // Sọc sân
+    for (
+        let i = 0;
+        i < 12;
+        i++
+    ) {
+
+        if (i % 2 === 0) {
+
+            ctx.fillStyle =
+                "rgba(255,255,255,0.035)";
+
+
+            ctx.fillRect(
+                i * W / 12,
+                0,
+                W / 12,
+                H
+            );
+        }
+    }
+
+
+    // Biên
+    ctx.strokeStyle =
+        "white";
+
+    ctx.lineWidth = 4;
+
+
+    ctx.strokeRect(
+        30,
+        30,
+        W - 60,
+        H - 60
+    );
+
+
+    // Đường giữa
+    ctx.beginPath();
+
+    ctx.moveTo(
+        W / 2,
+        30
+    );
+
+    ctx.lineTo(
+        W / 2,
+        H - 30
+    );
+
+    ctx.stroke();
+
+
+    // Vòng tròn giữa
+    ctx.beginPath();
+
+    ctx.arc(
+        W / 2,
+        H / 2,
+        80,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.stroke();
+
+
+    // Chấm giữa
+    ctx.beginPath();
+
+    ctx.arc(
+        W / 2,
+        H / 2,
+        5,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle =
+        "white";
+
+    ctx.fill();
+
+
+    // Cấm địa trái
+    ctx.strokeRect(
+        30,
+        180,
+        120,
+        220
+    );
+
+
+    // Cấm địa phải
+    ctx.strokeRect(
+        W - 150,
+        180,
+        120,
+        220
+    );
+
+
+    // Goal trái
+    ctx.strokeRect(
+        0,
+        220,
+        30,
+        140
+    );
+
+
+    // Goal phải
+    ctx.strokeRect(
+        W - 30,
+        220,
+        30,
+        140
+    );
+}
+
+
+// ======================================================
+// DRAW PLAYER
+// ======================================================
+
+function drawPlayer() {
+
+    ctx.beginPath();
+
+    ctx.arc(
+        player.x,
+        player.y,
+        player.r,
+        0,
+        Math.PI * 2
+    );
+
+
+    ctx.fillStyle =
+        "#2563eb";
+
+    ctx.fill();
+
+
+    ctx.strokeStyle =
+        "white";
+
+    ctx.lineWidth = 3;
+
+    ctx.stroke();
+
+
+    ctx.fillStyle =
+        "white";
+
+    ctx.font =
+        "bold 10px Arial";
+
+    ctx.textAlign =
+        "center";
+
+    ctx.textBaseline =
+        "middle";
+
+
+    ctx.fillText(
+        "12A9",
+        player.x,
+        player.y
+    );
+}
+
+
+// ======================================================
+// DRAW ENEMY
+// ======================================================
+
+function drawEnemy() {
+
+    ctx.beginPath();
+
+    ctx.arc(
+        enemy.x,
+        enemy.y,
+        enemy.r,
+        0,
+        Math.PI * 2
+    );
+
+
+    ctx.fillStyle =
+        "#ef4444";
+
+    ctx.fill();
+
+
+    ctx.strokeStyle =
+        "white";
+
+    ctx.lineWidth = 3;
+
+    ctx.stroke();
+
+
+    ctx.fillStyle =
+        "white";
+
+    ctx.font =
+        "bold 8px Arial";
+
+    ctx.textAlign =
+        "center";
+
+    ctx.textBaseline =
+        "middle";
+
+
+    ctx.fillText(
+        "BẠN",
+        enemy.x,
+        enemy.y
+    );
+}
+
+
+// ======================================================
+// DRAW BALL
+// ======================================================
+
+function drawBall() {
+
+    ctx.beginPath();
+
+    ctx.arc(
+        ball.x,
+        ball.y,
+        ball.r,
+        0,
+        Math.PI * 2
+    );
+
+
+    ctx.fillStyle =
+        "white";
+
+    ctx.fill();
+
+
+    ctx.strokeStyle =
+        "#111";
+
+    ctx.lineWidth = 2;
+
+    ctx.stroke();
+
+
+    ctx.fillStyle =
+        "#222";
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        ball.x,
+        ball.y,
+        3,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+}
+
+
+// ======================================================
+// DRAW KEEPER
+// ======================================================
+
+function drawKeeper(keeper) {
+
+    ctx.fillStyle =
+        "#facc15";
+
+
+    ctx.fillRect(
+        keeper.x,
+        keeper.y,
+        keeper.w,
+        keeper.h
+    );
+
+
+    ctx.strokeStyle =
+        "white";
+
+    ctx.lineWidth = 2;
+
+
+    ctx.strokeRect(
+        keeper.x,
+        keeper.y,
+        keeper.w,
+        keeper.h
+    );
+}
+
+
+// ======================================================
+// DRAW PARTICLES
+// ======================================================
+
+function drawParticles() {
+
+    for (const p of particles) {
+
+        ctx.globalAlpha =
+            Math.max(
+                0,
+                p.life
+            );
+
+
+        ctx.fillStyle =
+            "white";
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            p.x,
+            p.y,
+            p.size,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fill();
+    }
+
+
+    ctx.globalAlpha = 1;
+}
+
+
+// ======================================================
+// CELEBRATION
+// ======================================================
+
+function drawCelebration() {
+
+    if (!celebration)
+        return;
+
+
+    ctx.fillStyle =
+        "rgba(0,0,0,0.35)";
+
+
+    ctx.fillRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    ctx.textAlign =
+        "center";
+
+    ctx.textBaseline =
+        "middle";
+
+
+    ctx.font =
+        "bold 64px Arial";
+
+
+    ctx.fillStyle =
+        "white";
+
+
+    ctx.fillText(
+        celebrationText,
+        W / 2,
+        H / 2
+    );
+}
+
+
+// ======================================================
+// DRAW
+// ======================================================
+
+function draw() {
+
+    drawField();
+
+
+    drawKeeper(
+        keeperLeft
+    );
+
+
+    drawKeeper(
+        keeperRight
+    );
+
+
+    drawPlayer();
+
+
+    drawEnemy();
+
+
+    drawBall();
+
+
+    drawParticles();
+
+
+    drawCelebration();
+}
+
+
+// ======================================================
+// GAME LOOP
+// ======================================================
+
+let lastTime =
+    performance.now();
+
+
+function gameLoop(now) {
+
+    const dt =
+        Math.min(
+            (now - lastTime) / 1000,
+            0.033
+        );
+
+
+    lastTime = now;
+
+
+    update(dt);
+
+    draw();
+
+
+    requestAnimationFrame(
+        gameLoop
+    );
+}
+
+
+// ======================================================
+// START
+// ======================================================
+
+requestAnimationFrame(
+    gameLoop
+);
+
+</script>
+
+</body>
+</html>
